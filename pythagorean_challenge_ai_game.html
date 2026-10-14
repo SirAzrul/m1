@@ -1,0 +1,2263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>CABARAN PYTHAGORAS — Permainan Matematik AI Pengesanan Tangan</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            outfit: ['Outfit', 'sans-serif'],
+            inter: ['Inter', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            cyanNeon: '#00f0ff',
+            amberNeon: '#f59e0b',
+            purpleNeon: '#a855f7',
+            emeraldNeon: '#10b981',
+            navyDark: '#050814',
+            navyCard: 'rgba(11, 18, 38, 0.85)',
+          },
+          boxShadow: {
+            neonCyan: '0 0 25px rgba(0, 240, 255, 0.45)',
+            neonAmber: '0 0 25px rgba(245, 158, 11, 0.45)',
+            neonGreen: '0 0 30px rgba(16, 185, 129, 0.55)',
+            neonRed: '0 0 30px rgba(239, 68, 68, 0.55)',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Outfit:wght@500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- MediaPipe Hands & Camera Utils -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #050814;
+      color: #f1f5f9;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      overflow: hidden;
+    }
+    h1, h2, h3, .font-heading {
+      font-family: 'Outfit', sans-serif;
+    }
+    /* Grid background with mathematical aura */
+    .math-grid {
+      background-image: 
+        radial-gradient(circle at 50% 50%, rgba(0, 240, 255, 0.08) 0%, transparent 60%),
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 100% 100%, 40px 40px, 40px 40px;
+    }
+    /* Mirror Camera styling */
+    #webcamVideo {
+      transform: scaleX(-1);
+      filter: brightness(1.15) contrast(1.05);
+      object-fit: cover;
+    }
+    #handsCanvas {
+      transform: scaleX(-1);
+    }
+    /* Glowing animations */
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.6; filter: drop-shadow(0 0 10px #00f0ff); }
+      50% { opacity: 1; filter: drop-shadow(0 0 22px #00f0ff); }
+    }
+    .neon-pulse {
+      animation: pulseGlow 2s infinite ease-in-out;
+    }
+    @keyframes subtleWobble {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-4px) rotate(1deg); }
+    }
+    .card-wobble {
+      animation: subtleWobble 3s infinite ease-in-out;
+    }
+    @keyframes shakeAnimation {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
+    .zone-shake {
+      animation: shakeAnimation 0.4s ease-in-out;
+    }
+    /* Glassmorphism */
+    .glass-panel {
+      background: rgba(11, 18, 38, 0.82);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(0, 240, 255, 0.22);
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(10, 16, 30, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0, 240, 255, 0.3);
+      border-radius: 999px;
+    }
+  </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden math-grid">
+
+  <!-- CAMERA & SKELETON CANVAS LAYER -->
+  <div class="absolute inset-0 z-0 pointer-events-none opacity-45 overflow-hidden transition-opacity duration-700" id="cameraContainer">
+    <video id="webcamVideo" class="absolute w-full h-full object-cover" autoplay playsinline muted></video>
+    <canvas id="handsCanvas" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
+  </div>
+
+  <!-- MATHEMATICAL WATERMARK DECORATIONS -->
+  <div class="absolute inset-0 pointer-events-none z-0 overflow-hidden text-cyan-500/5 select-none font-mono font-bold">
+    <div class="absolute top-10 left-12 text-6xl">a² + b² = c²</div>
+    <div class="absolute bottom-20 left-1/4 text-8xl">c = √(a² + b²)</div>
+    <div class="absolute top-1/3 right-16 text-7xl">∠90°</div>
+    <div class="absolute bottom-12 right-12 text-6xl">b = √(c² - a²)</div>
+  </div>
+
+  <!-- DYNAMIC TETHER & PARTICLE CANVAS -->
+  <canvas id="fxCanvas" class="absolute inset-0 z-20 pointer-events-none"></canvas>
+
+  <!-- TOP HUD HEADER -->
+  <header class="relative z-30 flex items-center justify-between px-4 sm:px-8 py-3 glass-panel border-b border-cyan-500/20 shadow-lg">
+    <!-- Brand / Mode Indicator -->
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-neonCyan">
+        <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 21h18"/>
+          <path d="M3 21V5l18 16"/>
+          <path d="M7 21v-4h4"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="font-heading font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-200 to-indigo-300 text-lg sm:text-xl">
+          CABARAN PYTHAGORAS
+        </h1>
+        <div class="flex items-center space-x-2 text-xs font-mono text-cyan-300/80">
+          <span id="trackingStatusBadge" class="inline-flex items-center px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-[10px]">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping mr-1.5" id="statusDot"></span>
+            <span id="statusLabel">MEMULAKAN PENGESANAN...</span>
+          </span>
+          <span class="hidden sm:inline text-slate-500">|</span>
+          <span id="currentLevelBadge" class="hidden sm:inline font-bold text-amber-400">TAHAP: MUDAH</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center Stats: Timer & Question Counter -->
+    <div class="flex items-center space-x-4 sm:space-x-8">
+      <!-- Question Counter -->
+      <div class="text-center">
+        <div class="text-[10px] uppercase font-mono tracking-widest text-slate-400">Soalan</div>
+        <div class="font-heading font-extrabold text-lg sm:text-2xl text-cyan-300" id="hudQuestionProgress">1 / 10</div>
+      </div>
+
+      <!-- Main Game Timer -->
+      <div class="text-center">
+        <div class="text-[10px] uppercase font-mono tracking-widest text-slate-400">Masa Tinggal</div>
+        <div id="hudTimer" class="font-heading font-black text-2xl sm:text-3xl text-emerald-400 tracking-tight transition-all">
+          120<span class="text-xs font-normal text-slate-400 ml-1">s</span>
+        </div>
+      </div>
+
+      <!-- Score & Multiplier -->
+      <div class="text-center">
+        <div class="text-[10px] uppercase font-mono tracking-widest text-slate-400">Markah</div>
+        <div class="font-heading font-black text-lg sm:text-2xl text-amber-400 flex items-center justify-center space-x-1">
+          <span id="hudScore">0</span>
+          <span id="hudComboMultiplier" class="text-xs bg-amber-500/20 border border-amber-500/50 text-amber-300 px-1.5 py-0.5 rounded ml-1 hidden">1x</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Controls: Audio & Settings Toggle -->
+    <div class="flex items-center space-x-2">
+      <button id="btnAudioToggle" class="p-2.5 rounded-xl bg-slate-800/80 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/20 active:scale-95 transition" title="Suara">
+        <svg id="iconSoundOn" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+        <svg id="iconSoundOff" class="w-5 h-5 hidden text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
+      </button>
+
+      <button id="btnOpenTeacherMode" class="p-2.5 rounded-xl bg-slate-800/80 border border-purple-500/30 text-purple-300 hover:bg-purple-500/20 active:scale-95 transition" title="Mod Guru / Tetapan">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      </button>
+
+      <button id="btnOpenLeaderboard" class="p-2.5 rounded-xl bg-slate-800/80 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 active:scale-95 transition" title="Papan Skor">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN GAMEPLAY ARENA -->
+  <main id="gameArena" class="relative z-10 w-full h-[calc(100vh-68px)] flex flex-col justify-between p-4 overflow-hidden">
+    
+    <!-- TOP NOTIFICATION BANNER / COMBO NOTIFIER -->
+    <div class="relative w-full flex justify-center items-center pointer-events-none min-h-[40px]">
+      <div id="comboBanner" class="opacity-0 transition-all transform -translate-y-4 font-heading font-black text-xl sm:text-2xl text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-orange-400 to-red-500 drop-shadow-md">
+        🔥 3× KOMBO! PAKAR PYTHAGORAS!
+      </div>
+      <div id="hintBanner" class="hidden glass-panel px-4 py-2 rounded-xl border border-amber-500/40 text-amber-300 text-xs sm:text-sm font-medium flex items-center space-x-2 animate-bounce">
+        <svg class="w-5 h-5 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
+        <span id="hintText">Peringatan: c sentiasa merupakan sisi terpanjang!</span>
+      </div>
+    </div>
+
+    <!-- CENTER QUESTION BOARD & MATHEMATICAL TRIANGLE DISPLAY -->
+    <div class="w-full max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 glass-panel rounded-2xl p-4 sm:p-6 shadow-2xl border border-cyan-500/30">
+      
+      <!-- Left side: Scenario Story & Equation Prompts -->
+      <div class="flex-1 space-y-3 text-left">
+        <div class="flex items-center space-x-2">
+          <span id="questLevelTag" class="px-2.5 py-0.5 rounded-md bg-blue-500/20 border border-blue-400/40 text-blue-300 text-xs font-mono font-bold">
+            TAHAP 1: MUDAH
+          </span>
+          <span id="questFormulaHint" class="text-xs font-mono text-cyan-300/80">
+            Formula: a² + b² = c²
+          </span>
+        </div>
+
+        <h2 id="questTitle" class="font-heading font-bold text-lg sm:text-2xl text-white tracking-wide">
+          Kira panjang sisi yang tidak diketahui bagi segi tiga bersudut tegak ini.
+        </h2>
+
+        <p id="questContextDescription" class="text-sm text-slate-300 leading-relaxed font-normal">
+          Segi tiga bersudut tegak mempunyai sisi tegak a = 3 dan tapak b = 4. Cari nilai hipotenus c.
+        </p>
+
+        <!-- Current Side Status Chips -->
+        <div class="grid grid-cols-3 gap-2 pt-1 font-mono text-xs">
+          <div class="p-2 rounded-lg bg-slate-900/80 border border-cyan-500/20 text-center">
+            <span class="text-slate-400">Sisi a:</span>
+            <div id="sideAVal" class="font-bold text-cyan-400 text-base">3</div>
+          </div>
+          <div class="p-2 rounded-lg bg-slate-900/80 border border-cyan-500/20 text-center">
+            <span class="text-slate-400">Sisi b:</span>
+            <div id="sideBVal" class="font-bold text-cyan-400 text-base">4</div>
+          </div>
+          <div class="p-2 rounded-lg bg-slate-900/80 border border-amber-500/40 text-center relative overflow-hidden">
+            <div class="absolute inset-0 bg-amber-500/10 animate-pulse"></div>
+            <span class="text-amber-300 font-bold">Hipotenus c:</span>
+            <div id="sideCVal" class="font-black text-amber-400 text-base">?</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right side: High-contrast Dynamic Geometric Triangle SVG -->
+      <div class="relative w-64 h-56 sm:w-80 sm:h-64 flex items-center justify-center p-2 rounded-xl bg-slate-950/70 border border-cyan-500/20">
+        <svg id="triangleSvg" class="w-full h-full" viewBox="0 0 320 250">
+          <defs>
+            <!-- Glowing filters for missing side -->
+            <filter id="neonGlowA" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="4" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+            <filter id="neonGlowMissing" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="6" result="blur1" />
+              <feGaussianBlur stdDeviation="12" result="blur2" />
+              <feMerge><feMergeNode in="blur2" /><feMergeNode in="blur1" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+          </defs>
+
+          <!-- 90 Degree Angle Square Indicator -->
+          <path id="rightAngleMark" d="M 60 170 L 80 170 L 80 190" fill="none" stroke="#00f0ff" stroke-width="2.5" opacity="0.8"/>
+          <circle cx="70" cy="180" r="2.5" fill="#00f0ff" />
+
+          <!-- Filled Subtle Area -->
+          <polygon id="triangleFill" points="60,190 260,190 60,50" fill="rgba(0, 240, 255, 0.05)" />
+
+          <!-- Side A (Vertical) -->
+          <line id="svgLineA" x1="60" y1="190" x2="60" y2="50" stroke="#00f0ff" stroke-width="4.5" stroke-linecap="round" />
+          <!-- Side B (Horizontal Base) -->
+          <line id="svgLineB" x1="60" y1="190" x2="260" y2="190" stroke="#00f0ff" stroke-width="4.5" stroke-linecap="round" />
+          <!-- Hypotenuse C -->
+          <line id="svgLineC" x1="60" y1="50" x2="260" y2="190" stroke="#f59e0b" stroke-width="5" stroke-linecap="round" />
+
+          <!-- Side Labels -->
+          <text id="svgTextA" x="35" y="125" fill="#00f0ff" font-family="'JetBrains Mono', monospace" font-size="14" font-weight="bold" text-anchor="middle">a = 3</text>
+          <text id="svgTextB" x="160" y="215" fill="#00f0ff" font-family="'JetBrains Mono', monospace" font-size="14" font-weight="bold" text-anchor="middle">b = 4</text>
+          <text id="svgTextC" x="175" y="105" fill="#f59e0b" font-family="'JetBrains Mono', monospace" font-size="16" font-weight="900" text-anchor="middle">c = ?</text>
+        </svg>
+
+        <!-- Watermark Badge on Triangle -->
+        <span class="absolute bottom-2 right-2 text-[10px] font-mono text-slate-500 uppercase">a² + b² = c²</span>
+      </div>
+
+    </div>
+
+    <!-- FLOATING ANSWER CARDS ARENA (Boundaries for cards) -->
+    <div id="cardsBoundArea" class="relative flex-1 w-full my-2 min-h-[140px] pointer-events-none">
+      <!-- 5 Floating Interactive Cards will be spawned dynamically here -->
+    </div>
+
+    <!-- ANSWER DROP ZONE (BOTTOM TARGET) -->
+    <div id="answerDropZone" class="relative w-full max-w-xl mx-auto h-24 sm:h-28 rounded-2xl glass-panel border-2 border-dashed border-cyan-400/60 hover:border-cyan-400 flex flex-col items-center justify-center transition-all duration-200 overflow-hidden shadow-neonCyan group">
+      <!-- Background Ambient Glow -->
+      <div class="absolute inset-0 bg-gradient-to-t from-cyan-500/10 via-transparent to-transparent opacity-50 group-hover:opacity-100 transition-opacity"></div>
+      
+      <!-- Zone Icon & Text -->
+      <div class="relative z-10 flex items-center space-x-3 pointer-events-none">
+        <div class="w-10 h-10 rounded-full bg-cyan-500/20 border border-cyan-400 flex items-center justify-center text-cyan-300">
+          <svg class="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+          </svg>
+        </div>
+        <div class="text-left">
+          <div class="font-heading font-black tracking-wider text-sm sm:text-base text-cyan-200 uppercase">
+            ZON JAWAPAN — LEPASKAN DI SINI
+          </div>
+          <p class="text-[11px] sm:text-xs text-slate-300 font-mono">
+            Cubit ✊ untuk ambil kad · Bawa ke sini · Buka tangan 🖐️ untuk hantar
+          </p>
+        </div>
+      </div>
+
+      <!-- Active Drop Candidate Preview Inside Zone -->
+      <div id="dropZoneHighlight" class="absolute inset-0 bg-cyan-400/20 hidden pointer-events-none border-2 border-cyan-300 animate-pulse"></div>
+    </div>
+
+  </main>
+
+  <!-- HAND TRACKING RETICLE OVERLAY -->
+  <div id="handReticle" class="fixed z-50 pointer-events-none transform -translate-x-1/2 -translate-y-1/2 transition-transform duration-75 hidden">
+    <div id="reticleRing" class="w-14 h-14 rounded-full border-2 border-cyan-400 flex items-center justify-center shadow-neonCyan transition-all duration-150">
+      <div id="reticleDot" class="w-3.5 h-3.5 rounded-full bg-cyan-400 transition-colors"></div>
+    </div>
+    <div id="reticleTag" class="absolute top-16 left-1/2 -translate-x-1/2 whitespace-nowrap px-2 py-0.5 rounded-md bg-slate-900/90 border border-cyan-400/50 text-[10px] font-mono text-cyan-300 tracking-wider">
+      BUKA TANGAN — SEDIA 🖐️
+    </div>
+  </div>
+
+  <!-- MODAL: WORKED PEDAGOGICAL SOLUTION (DIPAPARKAN UNTUK MAKLUM BALAS BETUL ATAU SALAH SEBELUM KE SOALAN SETERUSNYA) -->
+  <div id="solutionModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md hidden transition-all duration-300 p-4">
+    <div class="relative w-full max-w-lg glass-panel border border-emerald-400 rounded-3xl p-6 sm:p-8 text-center shadow-neonGreen transform scale-95 transition-transform duration-300" id="solutionCard">
+      <!-- Status Icon -->
+      <div id="solutionModalIconBox" class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center text-emerald-400 shadow-neonGreen text-3xl">
+        🎉
+      </div>
+
+      <div id="solutionModalSubtitle" class="text-xs font-mono uppercase tracking-widest text-emerald-400 font-bold mb-1">Pengiraan Yang Cemerlang!</div>
+      <h3 id="solutionModalTitle" class="font-heading font-black text-2xl sm:text-3xl text-white mb-2">JAWAPAN TEPAT! 🎉</h3>
+      <div id="solutionPointsEarned" class="inline-block px-3 py-1 rounded-full bg-emerald-400/20 text-emerald-300 font-mono text-sm font-bold mb-4">
+        +10 MATA + BONUS KEPANTASAN
+      </div>
+
+      <!-- Step-by-Step Algebraic Mathematical Solution -->
+      <div class="bg-slate-950/90 rounded-2xl p-4 sm:p-5 border border-slate-800 text-left font-mono space-y-2.5 text-xs sm:text-sm">
+        <div class="text-cyan-400 font-bold flex items-center space-x-1">
+          <span>📐</span>
+          <span>LANGKAH PENYELESAIAN LENGKAP:</span>
+        </div>
+        <div id="solutionStepFormula" class="text-slate-300 pl-4 border-l-2 border-cyan-500/40">c² = a² + b²</div>
+        <div id="solutionStepSub" class="text-slate-300 pl-4 border-l-2 border-cyan-500/40">c² = 6² + 8²</div>
+        <div id="solutionStepSquares" class="text-slate-300 pl-4 border-l-2 border-cyan-500/40">c² = 36 + 64 = 100</div>
+        <div id="solutionStepResult" class="text-amber-400 font-bold pl-4 border-l-2 border-amber-500 text-sm sm:text-base">c = √100 = 10</div>
+      </div>
+
+      <button id="btnNextQuestionNow" class="mt-6 w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-heading font-extrabold text-base tracking-wider shadow-lg active:scale-98 transition">
+        SOALAN SETERUSNYA DALAM <span id="autoNextCountdown">3</span>s (ATAU TEKAN SINI) →
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL: KEPUTUSAN AKHIR & ANALISIS PEMBELAJARAN -->
+  <div id="resultsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-lg hidden p-4 overflow-y-auto">
+    <div class="relative w-full max-w-2xl glass-panel border border-cyan-400 rounded-3xl p-6 sm:p-8 text-center shadow-2xl my-auto">
+      
+      <!-- Rank Medal / Trophy -->
+      <div id="resultRankBadge" class="w-20 h-20 mx-auto mb-3 rounded-3xl bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-4xl shadow-neonAmber">
+        🏆
+      </div>
+
+      <h2 class="font-heading font-black text-2xl sm:text-4xl text-white tracking-wide">
+        CABARAN PYTHAGORAS SELESAI!
+      </h2>
+      <p id="resultRankTitle" class="font-heading font-extrabold text-amber-400 text-lg sm:text-xl tracking-wider uppercase mt-1">
+        PAKAR PYTHAGORAS
+      </p>
+
+      <!-- Key Score Metrics Grid -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 my-6 font-mono">
+        <div class="p-3 rounded-xl bg-slate-950/80 border border-cyan-500/30">
+          <div class="text-[10px] text-slate-400 uppercase">Skor Akhir</div>
+          <div id="resFinalScore" class="font-heading font-black text-2xl text-cyan-300">0</div>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-950/80 border border-cyan-500/30">
+          <div class="text-[10px] text-slate-400 uppercase">Ketepatan</div>
+          <div id="resAccuracy" class="font-heading font-black text-2xl text-emerald-400">0%</div>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-950/80 border border-cyan-500/30">
+          <div class="text-[10px] text-slate-400 uppercase">Kombo Terbaik</div>
+          <div id="resBestCombo" class="font-heading font-black text-2xl text-amber-400">0x</div>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-950/80 border border-cyan-500/30">
+          <div class="text-[10px] text-slate-400 uppercase">Purata Masa</div>
+          <div id="resAvgSpeed" class="font-heading font-black text-2xl text-purple-400">0s</div>
+        </div>
+      </div>
+
+      <!-- Pedagogical Session Performance Analysis -->
+      <div class="bg-slate-950/90 rounded-2xl p-5 border border-slate-800 text-left font-mono text-xs sm:text-sm space-y-3 mb-6">
+        <div class="font-heading font-bold text-cyan-300 flex items-center space-x-2 text-sm">
+          <span>🧠</span>
+          <span>ANALISIS PEMBELAJARAN & PRESTASI ANDA:</span>
+        </div>
+        <div>
+          <span class="text-emerald-400 font-bold">✓ KEKUATAN:</span>
+          <p id="analysisStrength" class="text-slate-300 text-xs mt-0.5">
+            Konsisten mengenal pasti hubungan hipotenus dengan tepat serta kepantasan mengira yang tinggi.
+          </p>
+        </div>
+        <div>
+          <span class="text-amber-400 font-bold">⚠ ASPEK PERLU DITINGKATKAN:</span>
+          <p id="analysisImprovement" class="text-slate-300 text-xs mt-0.5">
+            Kadangkala terkeliru semasa mencari sisi tegak (terlupa menolak punca kuasa sebelum mengira).
+          </p>
+        </div>
+        <div class="pt-2 border-t border-slate-800">
+          <span class="text-cyan-400 font-bold">💡 CADANGAN GURU:</span>
+          <p id="analysisRecommendation" class="text-slate-300 text-xs mt-0.5">
+            Banyakkan latihan mengasingkan sisi tegak menggunakan <code class="text-amber-300 font-bold">a = √(c² − b²)</code> apabila hipotenus telah diketahui.
+          </p>
+        </div>
+      </div>
+
+      <!-- Player Name Input for Leaderboard -->
+      <div class="flex flex-col sm:flex-row items-center gap-3 justify-center mb-4">
+        <input id="playerNameInput" type="text" maxlength="15" placeholder="Masukkan Nama Juara..." class="w-full sm:w-64 px-4 py-3 rounded-xl bg-slate-900 border border-cyan-500/50 text-white font-mono text-center focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400" />
+        <button id="btnSaveToLeaderboard" class="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-heading font-extrabold text-sm uppercase tracking-wider transition shadow-neonAmber">
+          SIMPAN SKOR 🏆
+        </button>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+        <button id="btnPlayAgain" class="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-heading font-black text-sm uppercase tracking-wider transition shadow-neonCyan">
+          MAIN SEMULA 🔄
+        </button>
+        <button id="btnBackToStart" class="py-3.5 px-6 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-white font-heading font-bold text-sm tracking-wider transition">
+          MENU UTAMA
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL: TETAPAN GURU / TEACHER MODE -->
+  <div id="teacherModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md hidden p-4 overflow-y-auto">
+    <div class="relative w-full max-w-xl glass-panel border border-purple-500 rounded-3xl p-6 sm:p-8 text-left shadow-2xl my-auto">
+      <div class="flex items-center justify-between border-b border-purple-500/30 pb-4 mb-5">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-400 flex items-center justify-center text-purple-300">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+          </div>
+          <div>
+            <h3 class="font-heading font-black text-xl text-white">TETAPAN GURU & KAWALAN MAKMAL</h3>
+            <p class="text-xs text-purple-300/80 font-mono">Sesuaikan tahap kesukaran & parameter interaksi</p>
+          </div>
+        </div>
+        <button id="btnCloseTeacherModal" class="text-slate-400 hover:text-white p-2">✕</button>
+      </div>
+
+      <div class="space-y-4 font-mono text-xs text-slate-300">
+        <!-- Difficulty Level -->
+        <div>
+          <label class="block text-slate-400 mb-1 font-bold">KURIKULUM KESUKARAN</label>
+          <div class="grid grid-cols-4 gap-2">
+            <button class="teacher-diff-btn py-2 rounded-lg border border-cyan-500/40 bg-cyan-500/20 text-cyan-300 font-bold" data-diff="Easy">MUDAH (c)</button>
+            <button class="teacher-diff-btn py-2 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 hover:bg-slate-800" data-diff="Medium">SEDERHANA (a/b)</button>
+            <button class="teacher-diff-btn py-2 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 hover:bg-slate-800" data-diff="Hard">SUKAR (Nyata)</button>
+            <button class="teacher-diff-btn py-2 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 hover:bg-slate-800" data-diff="Mixed">CAMPURAN</button>
+          </div>
+        </div>
+
+        <!-- Question Count & Timer Duration -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-slate-400 mb-1 font-bold">BILANGAN SOALAN</label>
+            <select id="teacherQuestionsCount" class="w-full bg-slate-900 border border-purple-500/40 rounded-xl p-2.5 text-white focus:outline-none">
+              <option value="5">5 Soalan</option>
+              <option value="10" selected>10 Soalan</option>
+              <option value="15">15 Soalan</option>
+              <option value="20">20 Soalan</option>
+            </select>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-slate-400 font-bold">HAD MASA / TIMER</label>
+              <span class="text-[10px] text-purple-300 font-mono">Bebas ditaip</span>
+            </div>
+            <div class="relative flex items-center">
+              <input 
+                id="teacherGameTimerInput" 
+                type="number" 
+                min="5" 
+                max="3600" 
+                value="120" 
+                placeholder="cth: 120" 
+                class="w-full bg-slate-900 border border-purple-500/40 rounded-xl py-2.5 pl-3 pr-14 text-white font-mono text-sm focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400" 
+              />
+              <span class="absolute right-3 text-xs text-purple-400 font-mono pointer-events-none">saat</span>
+            </div>
+            <!-- Butang pintas masa -->
+            <div class="flex gap-1.5 mt-1.5">
+              <button type="button" class="timer-quick-preset px-2 py-0.5 rounded bg-slate-800 hover:bg-purple-900/50 text-[10px] text-slate-300 font-mono border border-slate-700" data-sec="30">30s</button>
+              <button type="button" class="timer-quick-preset px-2 py-0.5 rounded bg-slate-800 hover:bg-purple-900/50 text-[10px] text-slate-300 font-mono border border-slate-700" data-sec="60">60s</button>
+              <button type="button" class="timer-quick-preset px-2 py-0.5 rounded bg-slate-800 hover:bg-purple-900/50 text-[10px] text-slate-300 font-mono border border-slate-700" data-sec="120">120s</button>
+              <button type="button" class="timer-quick-preset px-2 py-0.5 rounded bg-slate-800 hover:bg-purple-900/50 text-[10px] text-slate-300 font-mono border border-slate-700" data-sec="300">300s</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hand Pinch Sensitivity & Card Speed -->
+        <div class="grid grid-cols-2 gap-4 pt-1">
+          <div>
+            <label class="block text-slate-400 mb-1 font-bold">KEPEKAAN CUBITAN (<span id="pinchValLabel">0.08</span>)</label>
+            <input id="teacherPinchSens" type="range" min="0.04" max="0.16" step="0.01" value="0.08" class="w-full accent-cyan-400 cursor-pointer" />
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1 font-bold">KELAJUAN APUNGAN KAD</label>
+            <select id="teacherCardSpeed" class="w-full bg-slate-900 border border-purple-500/40 rounded-xl p-2 text-white focus:outline-none">
+              <option value="0">Statik (Tiada Apungan)</option>
+              <option value="0.5">Apungan Perlahan</option>
+              <option value="1.0" selected>Apungan Biasa</option>
+              <option value="1.8">Apungan Pantas</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Toggles -->
+        <div class="pt-2 border-t border-slate-800 space-y-2">
+          <label class="flex items-center justify-between cursor-pointer">
+            <span>Papar Formula Pythagoras Di Skrin</span>
+            <input type="checkbox" id="teacherToggleFormula" checked class="w-4 h-4 accent-purple-400 rounded" />
+          </label>
+          <label class="flex items-center justify-between cursor-pointer">
+            <span>Papar Langkah Pengiraan Lengkap Selepas Menjawab</span>
+            <input type="checkbox" id="teacherToggleSolution" checked class="w-4 h-4 accent-purple-400 rounded" />
+          </label>
+          <label class="flex items-center justify-between cursor-pointer">
+            <span>Paparkan Garisan Skeleton AI Tangan</span>
+            <input type="checkbox" id="teacherToggleSkeleton" checked class="w-4 h-4 accent-purple-400 rounded" />
+          </label>
+          <label class="flex items-center justify-between cursor-pointer">
+            <span>Kesan Bunyi (Web Audio Synthesizer)</span>
+            <input type="checkbox" id="teacherToggleSound" checked class="w-4 h-4 accent-purple-400 rounded" />
+          </label>
+        </div>
+      </div>
+
+      <div class="mt-6 flex justify-end space-x-3">
+        <button id="btnSaveTeacherSettings" class="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-heading font-bold text-sm tracking-wide transition shadow-lg">
+          SIMPAN TETAPAN
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: PAPAN SKOR / LEADERBOARD -->
+  <div id="leaderboardModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md hidden p-4 overflow-y-auto">
+    <div class="relative w-full max-w-lg glass-panel border border-amber-500 rounded-3xl p-6 sm:p-8 text-center shadow-2xl my-auto">
+      <div class="flex items-center justify-between border-b border-amber-500/30 pb-4 mb-4">
+        <div class="flex items-center space-x-3">
+          <span class="text-3xl">🏆</span>
+          <div class="text-left">
+            <h3 class="font-heading font-black text-xl text-white">10 JUARA PYTHAGORAS TERATAS</h3>
+            <p class="text-xs text-amber-300 font-mono">Dewan Kemasyhuran Matematik</p>
+          </div>
+        </div>
+        <button id="btnCloseLeaderboard" class="text-slate-400 hover:text-white p-2">✕</button>
+      </div>
+
+      <div class="max-h-72 overflow-y-auto pr-1">
+        <table class="w-full text-left font-mono text-xs">
+          <thead>
+            <tr class="text-slate-400 border-b border-slate-800 text-[10px] uppercase">
+              <th class="py-2">Kedudukan</th>
+              <th class="py-2">Nama</th>
+              <th class="py-2 text-right">Skor</th>
+              <th class="py-2 text-right">Tepat</th>
+              <th class="py-2 text-right">Kombo</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboardTableBody">
+            <!-- Dynamic rows will appear here -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-6 flex items-center justify-between pt-3 border-t border-slate-800">
+        <button id="btnResetLeaderboard" class="text-xs font-mono text-red-400 hover:text-red-300 underline">
+          Set Semula Papan Skor
+        </button>
+        <button id="btnCloseLeaderboard2" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-heading font-bold text-xs uppercase">
+          TUTUP
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- START SCREEN OVERLAY -->
+  <div id="startScreen" class="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/95 backdrop-blur-xl p-4 overflow-y-auto">
+    <div class="relative w-full max-w-xl glass-panel border border-cyan-400 rounded-3xl p-6 sm:p-10 text-center shadow-neonCyan my-auto">
+      
+      <!-- Brand Emblem -->
+      <div class="w-20 h-20 mx-auto mb-4 rounded-3xl bg-gradient-to-tr from-cyan-500 via-blue-600 to-indigo-600 flex items-center justify-center shadow-neonCyan">
+        <svg class="w-12 h-12 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M3 21h18"/>
+          <path d="M3 21V5l18 16"/>
+          <path d="M7 21v-4h4"/>
+        </svg>
+      </div>
+
+      <h1 class="font-heading font-black text-3xl sm:text-5xl text-white tracking-wide">
+        CABARAN<br/>
+        <span class="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-300 to-amber-300">
+          PYTHAGORAS
+        </span>
+      </h1>
+      <p class="font-heading font-semibold text-cyan-300/90 text-sm sm:text-base tracking-widest mt-1 uppercase">
+        “Kira. Pegang. Padankan. Takluk.”
+      </p>
+
+      <!-- 4 Step Interactive Gestural How-To Cards -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 my-6 text-left font-mono">
+        <div class="p-3 rounded-xl bg-slate-900/90 border border-cyan-500/20">
+          <div class="text-lg mb-1">📐</div>
+          <div class="font-bold text-cyan-300 text-xs uppercase">1. Kira</div>
+          <p class="text-[10px] text-slate-400 leading-tight mt-1">Selesaikan sisi segitiga yang hilang: a² + b² = c².</p>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-900/90 border border-cyan-500/20">
+          <div class="text-lg mb-1">✊</div>
+          <div class="font-bold text-amber-300 text-xs uppercase">2. Cubit / Pegang</div>
+          <p class="text-[10px] text-slate-400 leading-tight mt-1">Cubit ibu jari & telunjuk untuk ambil kad jawapan.</p>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-900/90 border border-cyan-500/20">
+          <div class="text-lg mb-1">🎯</div>
+          <div class="font-bold text-blue-300 text-xs uppercase">3. Gerakkan</div>
+          <p class="text-[10px] text-slate-400 leading-tight mt-1">Bawa kad jawapan masuk ke dalam Zon Jawapan.</p>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-900/90 border border-cyan-500/20">
+          <div class="text-lg mb-1">🖐️</div>
+          <div class="font-bold text-emerald-300 text-xs uppercase">4. Lepaskan</div>
+          <p class="text-[10px] text-slate-400 leading-tight mt-1">Buka jari untuk lepaskan dan semak jawapan.</p>
+        </div>
+      </div>
+
+      <!-- Quick Dual Input Notice -->
+      <div class="bg-blue-950/60 rounded-xl p-3 border border-blue-500/30 text-xs text-blue-200/90 font-mono mb-6 flex items-center justify-center space-x-2">
+        <span>🎮</span>
+        <span>Sokongan Dwi Input: Kamera Web AI & Seretan Tetikus / Skrin Sentuh!</span>
+      </div>
+
+      <!-- Start Button & Submenu -->
+      <div class="space-y-3">
+        <button id="btnStartGame" class="w-full py-4 rounded-2xl bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-600 hover:from-cyan-300 hover:to-indigo-500 text-slate-950 font-heading font-black text-lg tracking-wider uppercase transition shadow-neonCyan active:scale-98">
+          MULAKAN SESI MAKMAL 🚀
+        </button>
+
+        <div class="flex items-center justify-center gap-3">
+          <button id="btnStartTeacherMode" class="flex-1 py-2.5 rounded-xl bg-purple-900/40 hover:bg-purple-800/60 border border-purple-500/40 text-purple-300 font-heading font-bold text-xs uppercase transition">
+            Mod Guru ⚙️
+          </button>
+          <button id="btnStartLeaderboard" class="flex-1 py-2.5 rounded-xl bg-amber-900/40 hover:bg-amber-800/60 border border-amber-500/40 text-amber-300 font-heading font-bold text-xs uppercase transition">
+            Papan Skor 🏆
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    class MathAudioEngine {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+      playPinch() {
+        if (!this.enabled) return;
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(420, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(840, this.ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.08);
+      }
+      playRelease() {
+        if (!this.enabled) return;
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(560, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(280, this.ctx.currentTime + 0.07);
+        gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.07);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.07);
+      }
+      playCorrect() {
+        if (!this.enabled) return;
+        this.init();
+        const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime + idx * 0.06);
+          gain.gain.setValueAtTime(0.15, this.ctx.currentTime + idx * 0.06);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + idx * 0.06 + 0.35);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(this.ctx.currentTime + idx * 0.06);
+          osc.stop(this.ctx.currentTime + idx * 0.06 + 0.35);
+        });
+      }
+      playError() {
+        if (!this.enabled) return;
+        this.init();
+        const osc1 = this.ctx.createOscillator();
+        const osc2 = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc1.type = 'sawtooth';
+        osc2.type = 'sawtooth';
+        osc1.frequency.setValueAtTime(140, this.ctx.currentTime);
+        osc1.frequency.linearRampToValueAtTime(90, this.ctx.currentTime + 0.25);
+        osc2.frequency.setValueAtTime(145, this.ctx.currentTime);
+        osc2.frequency.linearRampToValueAtTime(95, this.ctx.currentTime + 0.25);
+        gain.gain.setValueAtTime(0.18, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc1.start();
+        osc2.start();
+        osc1.stop(this.ctx.currentTime + 0.25);
+        osc2.stop(this.ctx.currentTime + 0.25);
+      }
+      playTick() {
+        if (!this.enabled) return;
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(900, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.04);
+      }
+      playFanfare() {
+        if (!this.enabled) return;
+        this.init();
+        const chords = [523.25, 659.25, 783.99, 1046.5, 1318.5];
+        chords.forEach((f, i) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(f, this.ctx.currentTime + i * 0.08);
+          gain.gain.setValueAtTime(0.12, this.ctx.currentTime + i * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + i * 0.08 + 0.6);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(this.ctx.currentTime + i * 0.08);
+          osc.stop(this.ctx.currentTime + i * 0.08 + 0.6);
+        });
+      }
+    }
+    const soundEngine = new MathAudioEngine();
+  </script>
+
+  <script>
+    const QUESTION_BANK = [
+      // TAHAP 1: MUDAH (Cari hipotenus c: a² + b² = c²)
+      {
+        id: 'L1_01',
+        level: 'Easy',
+        type: 'hypotenuse',
+        a: 3,
+        b: 4,
+        c: 5,
+        missing: 'c',
+        title: 'Kira Nilai Hipotenus c',
+        context: 'Segi tiga bersudut tegak mempunyai sisi a = 3 dan b = 4.',
+        distractors: [7, 12, 13, 6],
+        formula: 'c² = a² + b²',
+        steps: [
+          'c² = 3² + 4²',
+          'c² = 9 + 16 = 25',
+          'c = √25 = 5'
+        ]
+      },
+      {
+        id: 'L1_02',
+        level: 'Easy',
+        type: 'hypotenuse',
+        a: 6,
+        b: 8,
+        c: 10,
+        missing: 'c',
+        title: 'Kira Nilai Hipotenus c',
+        context: 'Diberi sisi menegak a = 6 dan tapak b = 8.',
+        distractors: [14, 12, 16, 24],
+        formula: 'c² = a² + b²',
+        steps: [
+          'c² = 6² + 8²',
+          'c² = 36 + 64 = 100',
+          'c = √100 = 10'
+        ]
+      },
+      {
+        id: 'L1_03',
+        level: 'Easy',
+        type: 'hypotenuse',
+        a: 5,
+        b: 12,
+        c: 13,
+        missing: 'c',
+        title: 'Kira Nilai Hipotenus c',
+        context: 'Segi tiga bersudut tegak dengan sisi a = 5 dan b = 12.',
+        distractors: [17, 15, 169, 11],
+        formula: 'c² = a² + b²',
+        steps: [
+          'c² = 5² + 12²',
+          'c² = 25 + 144 = 169',
+          'c = √169 = 13'
+        ]
+      },
+      {
+        id: 'L1_04',
+        level: 'Easy',
+        type: 'hypotenuse',
+        a: 8,
+        b: 15,
+        c: 17,
+        missing: 'c',
+        title: 'Kira Nilai Hipotenus c',
+        context: 'Segi tiga dengan sisi bersudut tegak a = 8 dan b = 15.',
+        distractors: [23, 19, 16, 21],
+        formula: 'c² = a² + b²',
+        steps: [
+          'c² = 8² + 15²',
+          'c² = 64 + 225 = 289',
+          'c = √289 = 17'
+        ]
+      },
+      {
+        id: 'L1_05',
+        level: 'Easy',
+        type: 'hypotenuse',
+        a: 7,
+        b: 24,
+        c: 25,
+        missing: 'c',
+        title: 'Kira Nilai Hipotenus c',
+        context: 'Sisi serenjang masing-masing berukuran a = 7 dan b = 24.',
+        distractors: [31, 26, 28, 30],
+        formula: 'c² = a² + b²',
+        steps: [
+          'c² = 7² + 24²',
+          'c² = 49 + 576 = 625',
+          'c = √625 = 25'
+        ]
+      },
+      {
+        id: 'L1_06',
+        level: 'Easy',
+        type: 'hypotenuse',
+        a: 9,
+        b: 12,
+        c: 15,
+        missing: 'c',
+        title: 'Kira Nilai Hipotenus c',
+        context: 'Segi tiga gandaan tiga (3-4-5) dengan a = 9 dan b = 12.',
+        distractors: [21, 18, 14, 25],
+        formula: 'c² = a² + b²',
+        steps: [
+          'c² = 9² + 12²',
+          'c² = 81 + 144 = 225',
+          'c = √225 = 15'
+        ]
+      },
+      {
+        id: 'L1_07',
+        level: 'Easy',
+        type: 'hypotenuse',
+        a: 12,
+        b: 16,
+        c: 20,
+        missing: 'c',
+        title: 'Kira Nilai Hipotenus c',
+        context: 'Sisi menegak a = 12 dan tapak mengufuk b = 16.',
+        distractors: [28, 24, 22, 25],
+        formula: 'c² = a² + b²',
+        steps: [
+          'c² = 12² + 16²',
+          'c² = 144 + 256 = 400',
+          'c = √400 = 20'
+        ]
+      },
+
+      // TAHAP 2: SEDERHANA (Cari sisi a atau b: b = √(c² - a²))
+      {
+        id: 'L2_01',
+        level: 'Medium',
+        type: 'leg',
+        a: 5,
+        b: 12,
+        c: 13,
+        missing: 'b',
+        title: 'Cari Panjang Sisi b',
+        context: 'Hipotenus c = 13 dan sisi a = 5. Cari panjang sisi b.',
+        distractors: [18, 8, 14, 10],
+        formula: 'b² = c² − a²',
+        steps: [
+          'b² = 13² − 5²',
+          'b² = 169 − 25 = 144',
+          'b = √144 = 12'
+        ]
+      },
+      {
+        id: 'L2_02',
+        level: 'Medium',
+        type: 'leg',
+        a: 6,
+        b: 8,
+        c: 10,
+        missing: 'b',
+        title: 'Cari Tapak Sisi b',
+        context: 'Hipotenus c = 10 dan sisi menegak a = 6. Tentukan b.',
+        distractors: [4, 16, 7, 12],
+        formula: 'b² = c² − a²',
+        steps: [
+          'b² = 10² − 6²',
+          'b² = 100 − 36 = 64',
+          'b = √64 = 8'
+        ]
+      },
+      {
+        id: 'L2_03',
+        level: 'Medium',
+        type: 'leg',
+        a: 9,
+        b: 12,
+        c: 15,
+        missing: 'a',
+        title: 'Cari Sisi Menegak a',
+        context: 'Tapak b = 12 dan hipotenus c = 15. Cari panjang sisi a.',
+        distractors: [3, 27, 10, 11],
+        formula: 'a² = c² − b²',
+        steps: [
+          'a² = 15² − 12²',
+          'a² = 225 − 144 = 81',
+          'a = √81 = 9'
+        ]
+      },
+      {
+        id: 'L2_04',
+        level: 'Medium',
+        type: 'leg',
+        a: 8,
+        b: 15,
+        c: 17,
+        missing: 'a',
+        title: 'Cari Sisi Menegak a',
+        context: 'Hipotenus c = 17 dan tapak b = 15. Selesaikan sisi a.',
+        distractors: [2, 32, 9, 11],
+        formula: 'a² = c² − b²',
+        steps: [
+          'a² = 17² − 15²',
+          'a² = 289 − 225 = 64',
+          'a = √64 = 8'
+        ]
+      },
+      {
+        id: 'L2_05',
+        level: 'Medium',
+        type: 'leg',
+        a: 7,
+        b: 24,
+        c: 25,
+        missing: 'a',
+        title: 'Cari Sisi Tegak a',
+        context: 'Hipotenus c = 25 dan tapak b = 24. Hitung nilai sisi a.',
+        distractors: [1, 49, 8, 12],
+        formula: 'a² = c² − b²',
+        steps: [
+          'a² = 25² − 24²',
+          'a² = 625 − 576 = 49',
+          'a = √49 = 7'
+        ]
+      },
+      {
+        id: 'L2_06',
+        level: 'Medium',
+        type: 'leg',
+        a: 15,
+        b: 20,
+        c: 25,
+        missing: 'b',
+        title: 'Cari Tapak Sisi b',
+        context: 'Hipotenus c = 25 dan sisi tegak a = 15. Berapakah b?',
+        distractors: [10, 40, 18, 22],
+        formula: 'b² = c² − a²',
+        steps: [
+          'b² = 25² − 15²',
+          'b² = 625 − 225 = 400',
+          'b = √400 = 20'
+        ]
+      },
+      {
+        id: 'L2_07',
+        level: 'Medium',
+        type: 'leg',
+        a: 10,
+        b: 24,
+        c: 26,
+        missing: 'b',
+        title: 'Cari Panjang Sisi b',
+        context: 'Segi tiga dengan hipotenus c = 26 dan sisi a = 10.',
+        distractors: [16, 36, 22, 28],
+        formula: 'b² = c² − a²',
+        steps: [
+          'b² = 26² − 10²',
+          'b² = 676 − 100 = 576',
+          'b = √576 = 24'
+        ]
+      },
+
+      // TAHAP 3: SUKAR (Situasi Kehidupan Nyata / Dunia Sebenar)
+      {
+        id: 'L3_01',
+        level: 'Hard',
+        type: 'real_world_c',
+        a: 12,
+        b: 5,
+        c: 13,
+        missing: 'c',
+        title: 'Panjang Tangga Bersandar',
+        context: 'Sebuah tangga penyelamat disandarkan ke tingkap menegak setinggi 12 m. Kaki tangga diletakkan 5 m dari dinding. Berapakah panjang tangga tersebut?',
+        distractors: [17, 14, 15, 18],
+        formula: 'Tangga² = Tinggi² + Tapak²',
+        steps: [
+          'Tangga merupakan hipotenus c.',
+          'c² = 12² + 5² = 144 + 25 = 169',
+          'c = √169 = 13 m'
+        ]
+      },
+      {
+        id: 'L3_02',
+        level: 'Hard',
+        type: 'real_world_c',
+        a: 9,
+        b: 12,
+        c: 15,
+        missing: 'c',
+        title: 'Kabel Sokongan Tiang Bendera',
+        context: 'Kabel sokongan dipasang dari puncak tiang bendera setinggi 9 m ke pancang tanah 12 m dari pangkal tiang. Berapakah panjang kabel itu?',
+        distractors: [21, 18, 14, 20],
+        formula: 'Kabel² = Tinggi² + Jarak²',
+        steps: [
+          'Kabel merupakan hipotenus c.',
+          'c² = 9² + 12² = 81 + 144 = 225',
+          'c = √225 = 15 m'
+        ]
+      },
+      {
+        id: 'L3_03',
+        level: 'Hard',
+        type: 'real_world_leg',
+        a: 24,
+        b: 7,
+        c: 25,
+        missing: 'b',
+        title: 'Jarak Mengufuk Tanjakan Kerusi Roda',
+        context: 'Tanjakan landai berukuran serong 25 m menuju ke platform hospital setinggi 24 m. Berapakah jarak mengufuk tanjakan dari dinding?',
+        distractors: [1, 49, 10, 12],
+        formula: 'Tapak² = Tanjakan² − Tinggi²',
+        steps: [
+          'Jarak mengufuk adalah sisi b.',
+          'b² = 25² − 24² = 625 − 576 = 49',
+          'b = √49 = 7 m'
+        ]
+      },
+      {
+        id: 'L3_04',
+        level: 'Hard',
+        type: 'real_world_c',
+        a: 16,
+        b: 12,
+        c: 20,
+        missing: 'c',
+        title: 'Saiz Pepenjuru Skrin Monitor TV',
+        context: 'Skrin monitor bilik darjah mempunyai ketinggian 12 inci dan kelebaran 16 inci. Kira ukuran pepenjuru skrin TV tersebut.',
+        distractors: [28, 24, 22, 25],
+        formula: 'Pepenjuru² = Lebar² + Tinggi²',
+        steps: [
+          'Pepenjuru mewakili hipotenus c.',
+          'c² = 16² + 12² = 256 + 144 = 400',
+          'c = √400 = 20 inci'
+        ]
+      },
+      {
+        id: 'L3_05',
+        level: 'Hard',
+        type: 'real_world_leg',
+        a: 6,
+        b: 8,
+        c: 10,
+        missing: 'a',
+        title: 'Tiang Tegak Kekuda Bumbung',
+        context: 'Kasau bumbung condong berukuran 10 m (hipotenus) dengan rentang mengufuk 8 m dari dinding. Berapakah tinggi tiang tengah kekuda?',
+        distractors: [2, 18, 5, 7],
+        formula: 'Tinggi² = Kasau² − Rentang²',
+        steps: [
+          'Tinggi tiang tengah adalah sisi a.',
+          'a² = 10² − 8² = 100 − 64 = 36',
+          'a = √36 = 6 m'
+        ]
+      },
+      {
+        id: 'L3_06',
+        level: 'Hard',
+        type: 'real_world_c',
+        a: 8,
+        b: 15,
+        c: 17,
+        missing: 'c',
+        title: 'Jarak Pintas Laluan Padang',
+        context: 'Seorang pelajar berjalan 8 m ke Utara dan kemudian 15 m ke Timur. Berapakah jarak garis lurus pintas kembali ke titik permulaan?',
+        distractors: [23, 19, 20, 21],
+        formula: 'Jarak Pintas² = Utara² + Timur²',
+        steps: [
+          'Laluan garis lurus pintas ialah hipotenus c.',
+          'c² = 8² + 15² = 64 + 225 = 289',
+          'c = √289 = 17 m'
+        ]
+      }
+    ];
+  </script>
+
+  <script>
+    const state = {
+      // Game Config & Options
+      difficulty: 'Easy', // 'Easy', 'Medium', 'Hard', 'Mixed'
+      totalQuestions: 10,
+      timeLimit: 120,
+      pinchThreshold: 0.08,
+      driftSpeedMultiplier: 1.0,
+      showFormula: true,
+      showHints: true,
+      showSolution: true,
+      showSkeleton: true,
+      soundEnabled: true,
+
+      // Runtime Session State
+      isPlaying: false,
+      currentQuestionIndex: 0,
+      activeQuestion: null,
+      sessionQuestions: [],
+      score: 0,
+      combo: 0,
+      bestCombo: 0,
+      correctCount: 0,
+      wrongAttemptsCount: 0,
+      questionStartTime: 0,
+      totalResponseTime: 0,
+      timeLeft: 120,
+      timerInterval: null,
+      mistakeLog: [], // To formulate dynamic diagnostic analysis
+
+      // Hand & Pointer Tracking Coordinates
+      cursor: { x: window.innerWidth / 2, y: window.innerHeight / 2, isPinching: false, isDetected: false, source: 'none' },
+      grabbedCard: null,
+      floatingCards: [],
+      animFrameId: null,
+
+      // Fallback touch pointer
+      pointerDown: false
+    };
+
+    const dom = {
+      webcamVideo: document.getElementById('webcamVideo'),
+      handsCanvas: document.getElementById('handsCanvas'),
+      handsCtx: document.getElementById('handsCanvas').getContext('2d'),
+      fxCanvas: document.getElementById('fxCanvas'),
+      fxCtx: document.getElementById('fxCanvas').getContext('2d'),
+      gameArena: document.getElementById('gameArena'),
+      cardsBoundArea: document.getElementById('cardsBoundArea'),
+      answerDropZone: document.getElementById('answerDropZone'),
+      dropZoneHighlight: document.getElementById('dropZoneHighlight'),
+      handReticle: document.getElementById('handReticle'),
+      reticleRing: document.getElementById('reticleRing'),
+      reticleDot: document.getElementById('reticleDot'),
+      reticleTag: document.getElementById('reticleTag'),
+
+      // HUD elements
+      statusBadge: document.getElementById('trackingStatusBadge'),
+      statusDot: document.getElementById('statusDot'),
+      statusLabel: document.getElementById('statusLabel'),
+      currentLevelBadge: document.getElementById('currentLevelBadge'),
+      hudQuestionProgress: document.getElementById('hudQuestionProgress'),
+      hudTimer: document.getElementById('hudTimer'),
+      hudScore: document.getElementById('hudScore'),
+      hudComboMultiplier: document.getElementById('hudComboMultiplier'),
+      comboBanner: document.getElementById('comboBanner'),
+      hintBanner: document.getElementById('hintBanner'),
+      hintText: document.getElementById('hintText'),
+
+      // Question Presentation Elements
+      questLevelTag: document.getElementById('questLevelTag'),
+      questFormulaHint: document.getElementById('questFormulaHint'),
+      questTitle: document.getElementById('questTitle'),
+      questContextDescription: document.getElementById('questContextDescription'),
+      sideAVal: document.getElementById('sideAVal'),
+      sideBVal: document.getElementById('sideBVal'),
+      sideCVal: document.getElementById('sideCVal'),
+
+      // Triangle SVG Elements
+      svgLineA: document.getElementById('svgLineA'),
+      svgLineB: document.getElementById('svgLineB'),
+      svgLineC: document.getElementById('svgLineC'),
+      svgTextA: document.getElementById('svgTextA'),
+      svgTextB: document.getElementById('svgTextB'),
+      svgTextC: document.getElementById('svgTextC'),
+
+      // Modals
+      startScreen: document.getElementById('startScreen'),
+      solutionModal: document.getElementById('solutionModal'),
+      solutionCard: document.getElementById('solutionCard'),
+      solutionModalIconBox: document.getElementById('solutionModalIconBox'),
+      solutionModalSubtitle: document.getElementById('solutionModalSubtitle'),
+      solutionModalTitle: document.getElementById('solutionModalTitle'),
+      solutionPointsEarned: document.getElementById('solutionPointsEarned'),
+      solutionStepFormula: document.getElementById('solutionStepFormula'),
+      solutionStepSub: document.getElementById('solutionStepSub'),
+      solutionStepSquares: document.getElementById('solutionStepSquares'),
+      solutionStepResult: document.getElementById('solutionStepResult'),
+      autoNextCountdown: document.getElementById('autoNextCountdown'),
+      btnNextQuestionNow: document.getElementById('btnNextQuestionNow'),
+
+      resultsModal: document.getElementById('resultsModal'),
+      resFinalScore: document.getElementById('resFinalScore'),
+      resAccuracy: document.getElementById('resAccuracy'),
+      resBestCombo: document.getElementById('resBestCombo'),
+      resAvgSpeed: document.getElementById('resAvgSpeed'),
+      resultRankBadge: document.getElementById('resultRankBadge'),
+      resultRankTitle: document.getElementById('resultRankTitle'),
+      analysisStrength: document.getElementById('analysisStrength'),
+      analysisImprovement: document.getElementById('analysisImprovement'),
+      analysisRecommendation: document.getElementById('analysisRecommendation'),
+      playerNameInput: document.getElementById('playerNameInput'),
+      btnSaveToLeaderboard: document.getElementById('btnSaveToLeaderboard'),
+
+      teacherModal: document.getElementById('teacherModal'),
+      leaderboardModal: document.getElementById('leaderboardModal'),
+      leaderboardTableBody: document.getElementById('leaderboardTableBody'),
+
+      // Buttons
+      btnStartGame: document.getElementById('btnStartGame'),
+      btnPlayAgain: document.getElementById('btnPlayAgain'),
+      btnBackToStart: document.getElementById('btnBackToStart'),
+      btnAudioToggle: document.getElementById('btnAudioToggle'),
+      iconSoundOn: document.getElementById('iconSoundOn'),
+      iconSoundOff: document.getElementById('iconSoundOff'),
+      btnOpenTeacherMode: document.getElementById('btnOpenTeacherMode'),
+      btnStartTeacherMode: document.getElementById('btnStartTeacherMode'),
+      btnCloseTeacherModal: document.getElementById('btnCloseTeacherModal'),
+      btnSaveTeacherSettings: document.getElementById('btnSaveTeacherSettings'),
+      btnOpenLeaderboard: document.getElementById('btnOpenLeaderboard'),
+      btnStartLeaderboard: document.getElementById('btnStartLeaderboard'),
+      btnCloseLeaderboard: document.getElementById('btnCloseLeaderboard'),
+      btnCloseLeaderboard2: document.getElementById('btnCloseLeaderboard2'),
+      btnResetLeaderboard: document.getElementById('btnResetLeaderboard'),
+
+      // Settings Inputs
+      teacherQuestionsCount: document.getElementById('teacherQuestionsCount'),
+      teacherGameTimerInput: document.getElementById('teacherGameTimerInput'),
+      teacherPinchSens: document.getElementById('teacherPinchSens'),
+      pinchValLabel: document.getElementById('pinchValLabel'),
+      teacherCardSpeed: document.getElementById('teacherCardSpeed'),
+      teacherToggleFormula: document.getElementById('teacherToggleFormula'),
+      teacherToggleSolution: document.getElementById('teacherToggleSolution'),
+      teacherToggleSkeleton: document.getElementById('teacherToggleSkeleton'),
+      teacherToggleSound: document.getElementById('teacherToggleSound')
+    };
+
+    function resizeCanvases() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      dom.handsCanvas.width = w;
+      dom.handsCanvas.height = h;
+      dom.fxCanvas.width = w;
+      dom.fxCanvas.height = h;
+    }
+    window.addEventListener('resize', resizeCanvases);
+    resizeCanvases();
+
+    let handsDetector = null;
+    let cameraInstance = null;
+    let autoNextTimeout = null;
+    let autoNextInterval = null;
+
+    async function initMediaPipeHands() {
+      try {
+        handsDetector = new Hands({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+
+        handsDetector.setOptions({
+          maxNumHands: 1,
+          modelComplexity: 1,
+          minDetectionConfidence: 0.55,
+          minTrackingConfidence: 0.55
+        });
+
+        handsDetector.onResults(onHandResults);
+
+        cameraInstance = new Camera(dom.webcamVideo, {
+          onFrame: async () => {
+            if (dom.webcamVideo && dom.webcamVideo.videoWidth > 0) {
+              await handsDetector.send({ image: dom.webcamVideo });
+            }
+          },
+          width: 640,
+          height: 480
+        });
+
+        await cameraInstance.start();
+        updateTrackingBadge(true, "AI TANGAN DIKESAN");
+      } catch (err) {
+        console.warn("Kamera atau MediaPipe tidak tersedia, mod tetikus/sentuh diaktifkan:", err);
+        updateTrackingBadge(false, "MOD TETIKUS / SENTUHAN");
+      }
+    }
+
+    function updateTrackingBadge(isAi, label) {
+      dom.statusLabel.textContent = label;
+      if (isAi) {
+        dom.statusDot.className = "w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5";
+        dom.statusBadge.className = "inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-[10px] text-emerald-300";
+      } else {
+        dom.statusDot.className = "w-1.5 h-1.5 rounded-full bg-blue-400 mr-1.5";
+        dom.statusBadge.className = "inline-flex items-center px-2 py-0.5 rounded-full bg-blue-950/80 border border-blue-500/40 text-[10px] text-blue-300";
+      }
+    }
+
+    function onHandResults(results) {
+      dom.handsCtx.clearRect(0, 0, dom.handsCanvas.width, dom.handsCanvas.height);
+
+      if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+        if (state.cursor.source === 'ai') {
+          state.cursor.isDetected = false;
+          dom.handReticle.classList.add('hidden');
+          if (state.grabbedCard) {
+            releaseCard(false);
+          }
+        }
+        return;
+      }
+
+      state.cursor.isDetected = true;
+      state.cursor.source = 'ai';
+      const landmarks = results.multiHandLandmarks[0];
+
+      // Mirror view math: MediaPipe x is normalized [0, 1]. Mirror camera is flipped, so (1 - x)
+      const thumbTip = landmarks[4];
+      const indexTip = landmarks[8];
+
+      const screenX = (1 - indexTip.x) * window.innerWidth;
+      const screenY = indexTip.y * window.innerHeight;
+
+      const dx = thumbTip.x - indexTip.x;
+      const dy = thumbTip.y - indexTip.y;
+      const dz = thumbTip.z - indexTip.z;
+      const pinchDist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+      const isPinchNow = pinchDist < state.pinchThreshold;
+
+      // Smooth cursor lerp
+      state.cursor.x += (screenX - state.cursor.x) * 0.45;
+      state.cursor.y += (screenY - state.cursor.y) * 0.45;
+
+      // Handle Pinch Transition
+      if (isPinchNow && !state.cursor.isPinching) {
+        handlePinchStart();
+      } else if (!isPinchNow && state.cursor.isPinching) {
+        handlePinchEnd();
+      }
+      state.cursor.isPinching = isPinchNow;
+
+      // Update Custom Reticle
+      dom.handReticle.classList.remove('hidden');
+      dom.handReticle.style.left = `${state.cursor.x}px`;
+      dom.handReticle.style.top = `${state.cursor.y}px`;
+
+      if (isPinchNow) {
+        dom.reticleRing.className = "w-16 h-16 rounded-full border-2 border-amber-400 flex items-center justify-center shadow-neonAmber scale-110 transition-transform duration-100";
+        dom.reticleDot.className = "w-4 h-4 rounded-full bg-amber-400";
+        dom.reticleTag.textContent = "CUBIT — MEMEGANG KAD ✊";
+        dom.reticleTag.className = "absolute top-18 left-1/2 -translate-x-1/2 whitespace-nowrap px-2 py-0.5 rounded-md bg-amber-950/90 border border-amber-400/60 text-[10px] font-mono text-amber-300 font-bold";
+      } else {
+        dom.reticleRing.className = "w-14 h-14 rounded-full border-2 border-cyan-400 flex items-center justify-center shadow-neonCyan scale-100 transition-transform duration-100";
+        dom.reticleDot.className = "w-3 h-3 rounded-full bg-cyan-400";
+        dom.reticleTag.textContent = "BUKA TANGAN — SEDIA 🖐️";
+        dom.reticleTag.className = "absolute top-16 left-1/2 -translate-x-1/2 whitespace-nowrap px-2 py-0.5 rounded-md bg-slate-900/90 border border-cyan-400/50 text-[10px] font-mono text-cyan-300";
+      }
+
+      // Draw Futuristic Hand Skeleton if enabled
+      if (state.showSkeleton) {
+        drawFuturisticSkeleton(landmarks);
+      }
+    }
+
+    function drawFuturisticSkeleton(landmarks) {
+      const ctx = dom.handsCtx;
+      const w = dom.handsCanvas.width;
+      const h = dom.handsCanvas.height;
+
+      // Connective bone pairs
+      const CONNECTIONS = [
+        [0,1],[1,2],[2,3],[3,4], // Thumb
+        [0,5],[5,6],[6,7],[7,8], // Index
+        [0,9],[9,10],[10,11],[11,12], // Middle
+        [0,13],[13,14],[14,15],[15,16], // Ring
+        [0,17],[17,18],[18,19],[19,20], // Pinky
+        [5,9],[9,13],[13,17] // Palm bridge
+      ];
+
+      ctx.save();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = state.cursor.isPinching ? 'rgba(245, 158, 11, 0.75)' : 'rgba(0, 240, 255, 0.65)';
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = state.cursor.isPinching ? '#f59e0b' : '#00f0ff';
+
+      CONNECTIONS.forEach(([i, j]) => {
+        const x1 = (1 - landmarks[i].x) * w;
+        const y1 = landmarks[i].y * h;
+        const x2 = (1 - landmarks[j].x) * w;
+        const y2 = landmarks[j].y * h;
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      });
+
+      // Joint Nodes
+      landmarks.forEach((pt, idx) => {
+        const px = (1 - pt.x) * w;
+        const py = pt.y * h;
+        ctx.beginPath();
+        const isTip = [4, 8, 12, 16, 20].includes(idx);
+        ctx.arc(px, py, isTip ? 5 : 3, 0, Math.PI * 2);
+        ctx.fillStyle = isTip ? '#ffffff' : (state.cursor.isPinching ? '#f59e0b' : '#00f0ff');
+        ctx.fill();
+      });
+      ctx.restore();
+    }
+
+    window.addEventListener('pointerdown', (e) => {
+      // Do not override if user clicked on modal buttons
+      if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) return;
+      state.pointerDown = true;
+      state.cursor.x = e.clientX;
+      state.cursor.y = e.clientY;
+      state.cursor.source = 'pointer';
+      state.cursor.isDetected = true;
+      dom.handReticle.classList.remove('hidden');
+      dom.handReticle.style.left = `${e.clientX}px`;
+      dom.handReticle.style.top = `${e.clientY}px`;
+      handlePinchStart();
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      if (state.cursor.source === 'pointer' || !state.cursor.isDetected) {
+        state.cursor.x = e.clientX;
+        state.cursor.y = e.clientY;
+        dom.handReticle.style.left = `${e.clientX}px`;
+        dom.handReticle.style.top = `${e.clientY}px`;
+      }
+    });
+
+    window.addEventListener('pointerup', () => {
+      if (state.cursor.source === 'pointer') {
+        state.pointerDown = false;
+        handlePinchEnd();
+      }
+    });
+
+    function handlePinchStart() {
+      soundEngine.playPinch();
+      // Find nearest floating card within radius
+      if (!state.grabbedCard) {
+        const cx = state.cursor.x;
+        const cy = state.cursor.y;
+        let closest = null;
+        let minDist = 85; // Proximity threshold in pixels
+
+        state.floatingCards.forEach(card => {
+          const rect = card.el.getBoundingClientRect();
+          const cardCenterX = rect.left + rect.width / 2;
+          const cardCenterY = rect.top + rect.height / 2;
+          const d = Math.hypot(cardCenterX - cx, cardCenterY - cy);
+          if (d < minDist) {
+            minDist = d;
+            closest = card;
+          }
+        });
+
+        if (closest) {
+          state.grabbedCard = closest;
+          closest.isGrabbed = true;
+          closest.el.classList.add('scale-110', 'ring-4', 'ring-amber-400', 'shadow-neonAmber');
+          closest.el.classList.remove('card-wobble');
+        }
+      }
+    }
+
+    function handlePinchEnd() {
+      if (state.grabbedCard) {
+        soundEngine.playRelease();
+        checkCardDropInZone(state.grabbedCard);
+      }
+    }
+
+    function checkCardDropInZone(card) {
+      const dropRect = dom.answerDropZone.getBoundingClientRect();
+      const cardRect = card.el.getBoundingClientRect();
+      const cardCenterX = cardRect.left + cardRect.width / 2;
+      const cardCenterY = cardRect.top + cardRect.height / 2;
+
+      // Inside Drop Zone check
+      const isInside = 
+        cardCenterX >= dropRect.left &&
+        cardCenterX <= dropRect.right &&
+        cardCenterY >= dropRect.top &&
+        cardCenterY <= dropRect.bottom;
+
+      if (isInside) {
+        verifyAnswer(card);
+      } else {
+        releaseCard(false);
+      }
+    }
+
+    function releaseCard(wasAccepted) {
+      if (!state.grabbedCard) return;
+      const card = state.grabbedCard;
+      card.isGrabbed = false;
+      card.el.classList.remove('scale-110', 'ring-4', 'ring-amber-400', 'shadow-neonAmber');
+      card.el.classList.add('card-wobble');
+
+      if (!wasAccepted) {
+        // Gently push back towards card arena center
+        const area = dom.cardsBoundArea.getBoundingClientRect();
+        card.vx = (Math.random() - 0.5) * 2;
+        card.vy = (Math.random() - 0.5) * 2;
+      }
+      state.grabbedCard = null;
+    }
+
+    function spawnAnswerCards(question) {
+      // Clear existing cards
+      dom.cardsBoundArea.innerHTML = '';
+      state.floatingCards = [];
+      state.grabbedCard = null;
+
+      // Prepare 5 options: 1 correct + 4 smart distractors
+      const correctVal = question[question.missing];
+      const uniqueOptions = Array.from(new Set([correctVal, ...question.distractors])).slice(0, 5);
+
+      // In case distractors were fewer, fill with intelligent variations
+      while (uniqueOptions.length < 5) {
+        const filler = correctVal + (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 5) + 1);
+        if (filler > 0 && !uniqueOptions.includes(filler)) {
+          uniqueOptions.push(filler);
+        }
+      }
+
+      // Shuffle options
+      uniqueOptions.sort(() => Math.random() - 0.5);
+
+      const areaRect = dom.cardsBoundArea.getBoundingClientRect();
+      const areaW = areaRect.width || (window.innerWidth - 60);
+      const areaH = Math.max(areaRect.height, 150);
+
+      uniqueOptions.forEach((val, idx) => {
+        const cardEl = document.createElement('div');
+        cardEl.className = "absolute z-20 pointer-events-auto cursor-grab active:cursor-grabbing w-24 h-24 sm:w-28 sm:h-28 rounded-2xl glass-panel border-2 border-cyan-400/80 hover:border-cyan-300 flex flex-col items-center justify-center shadow-neonCyan card-wobble transition-colors select-none";
+        
+        cardEl.innerHTML = `
+          <div class="text-[10px] font-mono text-cyan-300/80 uppercase font-bold tracking-widest">NILAI</div>
+          <div class="font-heading font-black text-3xl sm:text-4xl text-white tracking-tight drop-shadow-md">${val}</div>
+          <div class="text-[9px] font-mono text-slate-400">Cubit / Tarik</div>
+        `;
+
+        dom.cardsBoundArea.appendChild(cardEl);
+
+        // Distribute positions neatly across the area
+        const segment = areaW / 5;
+        const startX = segment * idx + 20;
+        const startY = 15 + (idx % 2 === 0 ? 10 : 35);
+
+        const cardObj = {
+          el: cardEl,
+          val: val,
+          isCorrect: val === correctVal,
+          x: startX,
+          y: startY,
+          vx: (Math.random() - 0.5) * 1.2 * state.driftSpeedMultiplier,
+          vy: (Math.random() - 0.5) * 1.2 * state.driftSpeedMultiplier,
+          isGrabbed: false,
+          width: 100,
+          height: 100
+        };
+
+        state.floatingCards.push(cardObj);
+      });
+    }
+
+    function startPhysicsLoop() {
+      function loop() {
+        renderTetherAndParticles();
+        updateCardPhysics();
+        state.animFrameId = requestAnimationFrame(loop);
+      }
+      if (state.animFrameId) cancelAnimationFrame(state.animFrameId);
+      state.animFrameId = requestAnimationFrame(loop);
+    }
+
+    function updateCardPhysics() {
+      const area = dom.cardsBoundArea.getBoundingClientRect();
+      const minX = 10;
+      const maxX = area.width - 110;
+      const minY = 5;
+      const maxY = area.height - 105;
+
+      state.floatingCards.forEach(card => {
+        if (card.isGrabbed) {
+          // Card smoothly follows hand cursor
+          const targetX = state.cursor.x - area.left - 50;
+          const targetY = state.cursor.y - area.top - 50;
+          card.x += (targetX - card.x) * 0.4;
+          card.y += (targetY - card.y) * 0.4;
+        } else {
+          // Autonomous subtle floating bounce
+          card.x += card.vx * state.driftSpeedMultiplier;
+          card.y += card.vy * state.driftSpeedMultiplier;
+
+          // Wall boundary rebound
+          if (card.x <= minX) { card.x = minX; card.vx *= -1; }
+          if (card.x >= maxX) { card.x = maxX; card.vx *= -1; }
+          if (card.y <= minY) { card.y = minY; card.vy *= -1; }
+          if (card.y >= maxY) { card.y = maxY; card.vy *= -1; }
+        }
+
+        // Apply style transform
+        card.el.style.left = `${card.x}px`;
+        card.el.style.top = `${card.y}px`;
+      });
+    }
+
+    let particles = [];
+    function renderTetherAndParticles() {
+      const ctx = dom.fxCtx;
+      ctx.clearRect(0, 0, dom.fxCanvas.width, dom.fxCanvas.height);
+
+      // Render Energy Tether when card is grabbed
+      if (state.grabbedCard) {
+        const cardRect = state.grabbedCard.el.getBoundingClientRect();
+        const cardCx = cardRect.left + cardRect.width / 2;
+        const cardCy = cardRect.top + cardRect.height / 2;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(state.cursor.x, state.cursor.y);
+        ctx.lineTo(cardCx, cardCy);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#f59e0b';
+        ctx.shadowColor = '#f59e0b';
+        ctx.shadowBlur = 15;
+        ctx.stroke();
+
+        // Energy rings
+        ctx.beginPath();
+        ctx.arc((state.cursor.x + cardCx) / 2, (state.cursor.y + cardCy) / 2, 8, 0, Math.PI * 2);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Update & Render Celebration Particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.15; // Gravity
+        p.alpha -= 0.02;
+
+        if (p.alpha <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+
+        ctx.save();
+        ctx.globalAlpha = p.alpha;
+        ctx.fillStyle = p.color;
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    function createCelebrationBurst(x, y) {
+      const colors = ['#00f0ff', '#f59e0b', '#10b981', '#38bdf8', '#ffffff'];
+      for (let i = 0; i < 40; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 8 + 3;
+        particles.push({
+          x: x,
+          y: y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          size: Math.random() * 4 + 2,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          alpha: 1.0
+        });
+      }
+    }
+
+    function verifyAnswer(card) {
+      const responseTime = (Date.now() - state.questionStartTime) / 1000;
+      state.totalResponseTime += responseTime;
+
+      if (card.isCorrect) {
+        // JAWAPAN BETUL!
+        soundEngine.playCorrect();
+        const dropRect = dom.answerDropZone.getBoundingClientRect();
+        createCelebrationBurst(dropRect.left + dropRect.width / 2, dropRect.top + dropRect.height / 2);
+
+        state.correctCount++;
+        state.combo++;
+        if (state.combo > state.bestCombo) state.bestCombo = state.combo;
+
+        // Markah penuh untuk jawapan tepat
+        let earned = 10;
+        let speedBonus = 0;
+        if (responseTime < 8) {
+          speedBonus = 5;
+          earned += speedBonus;
+        }
+
+        // Bonus kombo
+        if (state.combo >= 2) {
+          earned += (state.combo * 2);
+        }
+
+        state.score += earned;
+        updateHUD();
+        showComboToast();
+        releaseCard(true);
+
+        // Paparkan modal penerangan jalan kira dan terus ke soalan seterusnya
+        displayFeedbackModal(true, earned, speedBonus > 0, card.val);
+
+      } else {
+        // JAWAPAN SALAH:
+        // Sesuai dengan permintaan: Jangan halang, kira 0 markah dan terus bergerak ke soalan seterusnya!
+        soundEngine.playError();
+        state.wrongAttemptsCount++;
+        state.combo = 0; // Kombo direset
+        updateHUD();
+
+        // Goncang zon jawapan & kilat merah
+        dom.answerDropZone.classList.add('zone-shake', 'border-red-500', 'shadow-neonRed');
+        setTimeout(() => {
+          dom.answerDropZone.classList.remove('zone-shake', 'border-red-500', 'shadow-neonRed');
+        }, 500);
+
+        // Rekod kesilapan untuk analisis pembelajaran akhir
+        state.mistakeLog.push({
+          question: state.activeQuestion,
+          pickedVal: card.val,
+          type: state.activeQuestion.type
+        });
+
+        releaseCard(true);
+
+        // Paparkan modal jawapan tidak tepat berserta jawapan sebenar & langkah, kemudian move ke soalan seterusnya
+        displayFeedbackModal(false, 0, false, card.val);
+      }
+    }
+
+    function showComboToast() {
+      if (state.combo >= 2) {
+        dom.comboBanner.textContent = state.combo >= 5 
+          ? `🔥 ${state.combo}× KOMBO! PAKAR PYTHAGORAS!`
+          : `⚡ ${state.combo}× KOMBO BERTERUSAN!`;
+        dom.comboBanner.classList.remove('opacity-0', '-translate-y-4');
+        dom.comboBanner.classList.add('opacity-100', 'translate-y-0');
+        setTimeout(() => {
+          dom.comboBanner.classList.remove('opacity-100', 'translate-y-0');
+          dom.comboBanner.classList.add('opacity-0', '-translate-y-4');
+        }, 1800);
+      }
+    }
+
+    function displayFeedbackModal(isCorrect, earnedPoints, gotSpeedBonus, selectedVal) {
+      const q = state.activeQuestion;
+      const correctVal = q[q.missing];
+
+      if (isCorrect) {
+        // Konfigurasi visual modal jika betul
+        dom.solutionCard.className = "relative w-full max-w-lg glass-panel border border-emerald-400 rounded-3xl p-6 sm:p-8 text-center shadow-neonGreen transform scale-100 transition-all duration-300";
+        dom.solutionModalIconBox.className = "w-16 h-16 mx-auto mb-4 rounded-2xl bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center text-emerald-400 shadow-neonGreen text-3xl";
+        dom.solutionModalIconBox.textContent = "🎉";
+        dom.solutionModalSubtitle.className = "text-xs font-mono uppercase tracking-widest text-emerald-400 font-bold mb-1";
+        dom.solutionModalSubtitle.textContent = "PENGIRAAN TEPAT & PANTAS!";
+        dom.solutionModalTitle.textContent = "TAHNIAH, JAWAPAN BETUL!";
+        dom.solutionPointsEarned.className = "inline-block px-3 py-1 rounded-full bg-emerald-400/20 text-emerald-300 font-mono text-sm font-bold mb-4";
+        dom.solutionPointsEarned.textContent = `+${earnedPoints} MATA ${gotSpeedBonus ? '· BONUS KEPANTASAN +5' : ''}`;
+        dom.btnNextQuestionNow.className = "mt-6 w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-heading font-extrabold text-base tracking-wider shadow-lg active:scale-98 transition";
+      } else {
+        // Konfigurasi visual modal jika salah (0 Markah & terangkan langkah betul)
+        dom.solutionCard.className = "relative w-full max-w-lg glass-panel border border-red-500 rounded-3xl p-6 sm:p-8 text-center shadow-neonRed transform scale-100 transition-all duration-300";
+        dom.solutionModalIconBox.className = "w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-500/20 border-2 border-red-500 flex items-center justify-center text-red-400 shadow-neonRed text-3xl";
+        dom.solutionModalIconBox.textContent = "❌";
+        dom.solutionModalSubtitle.className = "text-xs font-mono uppercase tracking-widest text-red-400 font-bold mb-1";
+        dom.solutionModalSubtitle.textContent = `ANDA MEMILIH: ${selectedVal} (KURANG TEPAT)`;
+        dom.solutionModalTitle.textContent = "JAWAPAN SALAH (0 MATA)";
+        dom.solutionPointsEarned.className = "inline-block px-3 py-1 rounded-full bg-red-500/20 text-red-300 font-mono text-sm font-bold mb-4";
+        dom.solutionPointsEarned.textContent = `JAWAPAN SEBENAR IALAH: ${correctVal}`;
+        dom.btnNextQuestionNow.className = "mt-6 w-full py-3.5 rounded-xl bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-400 hover:to-orange-400 text-slate-950 font-heading font-extrabold text-base tracking-wider shadow-lg active:scale-98 transition";
+      }
+
+      // Langkah penyelesaian terperinci
+      dom.solutionStepFormula.textContent = `Formula: ${q.formula}`;
+      dom.solutionStepSub.textContent = `Langkah 1: ${q.steps[0]}`;
+      dom.solutionStepSquares.textContent = `Langkah 2: ${q.steps[1]}`;
+      dom.solutionStepResult.textContent = `Langkah 3: ${q.steps[2]}`;
+
+      dom.solutionModal.classList.remove('hidden');
+
+      let countdown = 3;
+      dom.autoNextCountdown.textContent = countdown;
+
+      if (autoNextInterval) clearInterval(autoNextInterval);
+      if (autoNextTimeout) clearTimeout(autoNextTimeout);
+
+      autoNextInterval = setInterval(() => {
+        countdown--;
+        if (countdown >= 0) dom.autoNextCountdown.textContent = countdown;
+      }, 1000);
+
+      autoNextTimeout = setTimeout(() => {
+        closeSolutionAndAdvance();
+      }, 3400);
+    }
+
+    function closeSolutionAndAdvance() {
+      if (autoNextInterval) clearInterval(autoNextInterval);
+      if (autoNextTimeout) clearTimeout(autoNextTimeout);
+      dom.solutionModal.classList.add('hidden');
+      advanceToNextQuestion();
+    }
+
+    dom.btnNextQuestionNow.addEventListener('click', closeSolutionAndAdvance);
+
+    function loadQuestion(index) {
+      state.currentQuestionIndex = index;
+      state.activeQuestion = state.sessionQuestions[index];
+      state.questionStartTime = Date.now();
+      dom.hintBanner.classList.add('hidden');
+
+      const q = state.activeQuestion;
+
+      // Update question text & level badge
+      dom.hudQuestionProgress.textContent = `${index + 1} / ${state.sessionQuestions.length}`;
+      
+      const levelTranslations = { Easy: 'MUDAH', Medium: 'SEDERHANA', Hard: 'SUKAR' };
+      dom.questLevelTag.textContent = `TAHAP: ${levelTranslations[q.level] || q.level.toUpperCase()}`;
+      dom.questLevelTag.className = q.level === 'Easy' 
+        ? "px-2.5 py-0.5 rounded-md bg-blue-500/20 border border-blue-400/40 text-blue-300 text-xs font-mono font-bold"
+        : (q.level === 'Medium' 
+          ? "px-2.5 py-0.5 rounded-md bg-purple-500/20 border border-purple-400/40 text-purple-300 text-xs font-mono font-bold"
+          : "px-2.5 py-0.5 rounded-md bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-mono font-bold");
+
+      dom.questFormulaHint.style.display = state.showFormula ? 'inline' : 'none';
+      dom.questFormulaHint.textContent = `Formula: ${q.formula}`;
+      dom.questTitle.textContent = q.title;
+      dom.questContextDescription.textContent = q.context;
+
+      // Update Side Value Boxes
+      dom.sideAVal.textContent = q.missing === 'a' ? '?' : q.a;
+      dom.sideBVal.textContent = q.missing === 'b' ? '?' : q.b;
+      dom.sideCVal.textContent = q.missing === 'c' ? '?' : q.c;
+
+      // Update SVG Labels
+      dom.svgTextA.textContent = q.missing === 'a' ? 'a = ?' : `a = ${q.a}`;
+      dom.svgTextB.textContent = q.missing === 'b' ? 'b = ?' : `b = ${q.b}`;
+      dom.svgTextC.textContent = q.missing === 'c' ? 'c = ?' : `c = ${q.c}`;
+
+      // Reset Glow styles
+      [dom.svgLineA, dom.svgLineB, dom.svgLineC].forEach(line => {
+        line.removeAttribute('filter');
+        line.setAttribute('stroke', '#00f0ff');
+        line.setAttribute('stroke-width', '4.5');
+      });
+
+      // Highlight the unknown target side with animated neon glow
+      if (q.missing === 'a') {
+        dom.svgLineA.setAttribute('filter', 'url(#neonGlowMissing)');
+        dom.svgLineA.setAttribute('stroke', '#f59e0b');
+        dom.svgLineA.setAttribute('stroke-width', '6');
+      } else if (q.missing === 'b') {
+        dom.svgLineB.setAttribute('filter', 'url(#neonGlowMissing)');
+        dom.svgLineB.setAttribute('stroke', '#f59e0b');
+        dom.svgLineB.setAttribute('stroke-width', '6');
+      } else {
+        dom.svgLineC.setAttribute('filter', 'url(#neonGlowMissing)');
+        dom.svgLineC.setAttribute('stroke', '#f59e0b');
+        dom.svgLineC.setAttribute('stroke-width', '6.5');
+      }
+
+      // Spawn interactive floating cards
+      spawnAnswerCards(q);
+    }
+
+    function advanceToNextQuestion() {
+      if (state.currentQuestionIndex + 1 < state.sessionQuestions.length) {
+        loadQuestion(state.currentQuestionIndex + 1);
+      } else {
+        finishGameSession();
+      }
+    }
+
+    function startGameSession() {
+      soundEngine.init();
+      state.isPlaying = true;
+      state.score = 0;
+      state.combo = 0;
+      state.bestCombo = 0;
+      state.correctCount = 0;
+      state.wrongAttemptsCount = 0;
+      state.totalResponseTime = 0;
+      state.mistakeLog = [];
+      state.timeLeft = state.timeLimit;
+
+      // Select and shuffle questions based on Teacher difficulty setting
+      let pool = [...QUESTION_BANK];
+      if (state.difficulty !== 'Mixed') {
+        pool = pool.filter(q => q.level === state.difficulty);
+      }
+      pool.sort(() => Math.random() - 0.5);
+      state.sessionQuestions = pool.slice(0, state.totalQuestions);
+
+      // Hide Modals
+      dom.startScreen.classList.add('hidden');
+      dom.resultsModal.classList.add('hidden');
+      dom.teacherModal.classList.add('hidden');
+      dom.leaderboardModal.classList.add('hidden');
+
+      updateHUD();
+      loadQuestion(0);
+      startTimer();
+      startPhysicsLoop();
+    }
+
+    function startTimer() {
+      if (state.timerInterval) clearInterval(state.timerInterval);
+      state.timerInterval = setInterval(() => {
+        state.timeLeft--;
+        dom.hudTimer.innerHTML = `${state.timeLeft}<span class="text-xs font-normal text-slate-400 ml-1">s</span>`;
+
+        // Warning state for final 10 seconds
+        if (state.timeLeft <= 10 && state.timeLeft > 0) {
+          dom.hudTimer.className = "font-heading font-black text-2xl sm:text-3xl text-red-500 tracking-tight animate-pulse";
+          soundEngine.playTick();
+        }
+
+        if (state.timeLeft <= 0) {
+          clearInterval(state.timerInterval);
+          finishGameSession();
+        }
+      }, 1000);
+    }
+
+    function updateHUD() {
+      dom.hudScore.textContent = state.score;
+      if (state.combo >= 2) {
+        dom.hudComboMultiplier.classList.remove('hidden');
+        dom.hudComboMultiplier.textContent = `${state.combo}x`;
+      } else {
+        dom.hudComboMultiplier.classList.add('hidden');
+      }
+      const levelTranslations = { Easy: 'MUDAH', Medium: 'SEDERHANA', Hard: 'SUKAR', Mixed: 'CAMPURAN' };
+      dom.currentLevelBadge.textContent = `TAHAP: ${levelTranslations[state.difficulty] || state.difficulty.toUpperCase()}`;
+    }
+
+    function finishGameSession() {
+      state.isPlaying = false;
+      if (state.timerInterval) clearInterval(state.timerInterval);
+      soundEngine.playFanfare();
+
+      const totalAttempts = state.correctCount + state.wrongAttemptsCount;
+      const accuracy = totalAttempts > 0 ? Math.round((state.correctCount / totalAttempts) * 100) : 0;
+      const avgSpeed = state.correctCount > 0 ? (state.totalResponseTime / state.correctCount).toFixed(1) : 0;
+
+      dom.resFinalScore.textContent = state.score;
+      dom.resAccuracy.textContent = `${accuracy}%`;
+      dom.resBestCombo.textContent = `${state.bestCombo}x`;
+      dom.resAvgSpeed.textContent = `${avgSpeed}s`;
+
+      // Ranking Pedagogikal
+      let rankBadge = '🌱';
+      let rankTitle = 'TERUSKAN BERLATIH';
+      if (accuracy >= 90) {
+        rankBadge = '🏆';
+        rankTitle = 'PAKAR PYTHAGORAS';
+      } else if (accuracy >= 75) {
+        rankBadge = '🥇';
+        rankTitle = 'PAKAR SEGI TIGA';
+      } else if (accuracy >= 60) {
+        rankBadge = '🥈';
+        rankTitle = 'PENJELAJAH MATEMATIK';
+      }
+      dom.resultRankBadge.textContent = rankBadge;
+      dom.resultRankTitle.textContent = rankTitle;
+
+      generateLearningAnalysis(accuracy);
+
+      dom.resultsModal.classList.remove('hidden');
+    }
+
+    function generateLearningAnalysis(accuracy) {
+      const legMistakes = state.mistakeLog.filter(m => m.type === 'leg' || m.type === 'real_world_leg').length;
+      const hypMistakes = state.mistakeLog.filter(m => m.type === 'hypotenuse' || m.type === 'real_world_c').length;
+
+      if (accuracy >= 90) {
+        dom.analysisStrength.textContent = "Penguasaan luar biasa dalam membezakan hipotenus dan sisi tegak serta pantas mengira secara congak.";
+        dom.analysisImprovement.textContent = "Kesilapan sangat minimum dalam kedua-dua bentuk rajah dan soalan situasi kehidupan sebenar.";
+        dom.analysisRecommendation.textContent = "Sedia untuk beralih ke aplikasi Teorem Pythagoras 3D dan Nisbah Trigonometri!";
+      } else if (legMistakes > hypMistakes) {
+        dom.analysisStrength.textContent = "Cemerlang dalam mencari hipotenus menggunakan rumus penambahan c² = a² + b².";
+        dom.analysisImprovement.textContent = "Kerap terkeliru operasi apabila mencari sisi tegak yang lebih pendek (menambah nilai berbanding menolak daripada c²).";
+        dom.analysisRecommendation.textContent = "Peringatan: Apabila hipotenus c telah diketahui, tolak kuasa dua terlebih dahulu: b = √(c² − a²).";
+      } else if (hypMistakes >= legMistakes && hypMistakes > 0) {
+        dom.analysisStrength.textContent = "Memahami konsep hubungan geometri Teorem Pythagoras dalam situasi fizikal dengan baik.";
+        dom.analysisImprovement.textContent = "Cenderung memilih jawapan hasil tambah terus (a + b) berbanding punca kuasa hasil tambah √(a² + b²).";
+        dom.analysisRecommendation.textContent = "Sentiasa kuasakan dua setiap nombor terlebih dahulu sebelum menjumlahkan dan mempunca kuasakan.";
+      } else {
+        dom.analysisStrength.textContent = "Menunjukkan kesungguhan dan fokus yang tinggi semasa berinteraksi menggunakan kawalan AI tangan.";
+        dom.analysisImprovement.textContent = "Ulang kaji gandaan asas Pythagorean Triples (3-4-5, 5-12-13, 8-15-17) untuk mengukuhkan pengiraan pantas.";
+        dom.analysisRecommendation.textContent = "Perhatikan kedudukan tanda sudut 90° sebelum memilih kad jawapan yang bersesuaian.";
+      }
+    }
+
+    const LEADERBOARD_KEY = 'pythagorean_challenge_leaderboard_v1';
+
+    function getLeaderboard() {
+      try {
+        const data = localStorage.getItem(LEADERBOARD_KEY);
+        return data ? JSON.parse(data) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveLeaderboard(entries) {
+      try {
+        localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(entries.slice(0, 10)));
+      } catch (e) {}
+    }
+
+    function renderLeaderboardTable() {
+      const list = getLeaderboard();
+      dom.leaderboardTableBody.innerHTML = '';
+
+      if (list.length === 0) {
+        dom.leaderboardTableBody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-slate-500">No champions yet. Be the first!</td></tr>`;
+        return;
+      }
+
+      list.forEach((entry, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = "border-b border-slate-800/80 hover:bg-slate-900/40 text-slate-300";
+        tr.innerHTML = `
+          <td class="py-2.5 font-bold ${idx === 0 ? 'text-amber-400' : (idx === 1 ? 'text-slate-300' : (idx === 2 ? 'text-orange-400' : 'text-slate-400'))}">
+            #${idx + 1}
+          </td>
+          <td class="py-2.5 font-bold text-white">${escapeHtml(entry.name)}</td>
+          <td class="py-2.5 text-right font-black text-cyan-400">${entry.score}</td>
+          <td class="py-2.5 text-right text-emerald-400">${entry.accuracy}%</td>
+          <td class="py-2.5 text-right text-amber-300">${entry.combo}x</td>
+        `;
+        dom.leaderboardTableBody.appendChild(tr);
+      });
+    }
+
+    function escapeHtml(str) {
+      return (str || 'Pemain').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    dom.btnSaveToLeaderboard.addEventListener('click', () => {
+      const name = dom.playerNameInput.value.trim() || 'Jaguh Matematik';
+      const totalAttempts = state.correctCount + state.wrongAttemptsCount;
+      const accuracy = totalAttempts > 0 ? Math.round((state.correctCount / totalAttempts) * 100) : 0;
+
+      const entries = getLeaderboard();
+      entries.push({
+        name: name,
+        score: state.score,
+        accuracy: accuracy,
+        combo: state.bestCombo,
+        date: new Date().toLocaleDateString()
+      });
+
+      entries.sort((a, b) => b.score - a.score);
+      saveLeaderboard(entries);
+
+      dom.btnSaveToLeaderboard.textContent = "DISIMPAN! ✓";
+      dom.btnSaveToLeaderboard.disabled = true;
+      dom.btnSaveToLeaderboard.className = "w-full sm:w-auto px-6 py-3 rounded-xl bg-slate-800 text-emerald-400 font-mono text-sm";
+
+      setTimeout(() => {
+        renderLeaderboardTable();
+        dom.leaderboardModal.classList.remove('hidden');
+      }, 500);
+    });
+
+    dom.btnResetLeaderboard.addEventListener('click', () => {
+      localStorage.removeItem(LEADERBOARD_KEY);
+      renderLeaderboardTable();
+    });
+
+    // Teacher Difficulty Buttons
+    document.querySelectorAll('.teacher-diff-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.teacher-diff-btn').forEach(b => {
+          b.className = "teacher-diff-btn py-2 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 hover:bg-slate-800";
+        });
+        btn.className = "teacher-diff-btn py-2 rounded-lg border border-cyan-500/40 bg-cyan-500/20 text-cyan-300 font-bold";
+        state.difficulty = btn.dataset.diff;
+      });
+    });
+
+    dom.teacherPinchSens.addEventListener('input', (e) => {
+      dom.pinchValLabel.textContent = e.target.value;
+      state.pinchThreshold = parseFloat(e.target.value);
+    });
+
+    // Quick preset buttons for timer input
+    document.querySelectorAll('.timer-quick-preset').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (dom.teacherGameTimerInput) {
+          dom.teacherGameTimerInput.value = btn.dataset.sec;
+        }
+      });
+    });
+
+    dom.btnSaveTeacherSettings.addEventListener('click', () => {
+      state.totalQuestions = parseInt(dom.teacherQuestionsCount.value, 10);
+      
+      // Ambil nilai yang ditaip oleh pengguna secara fleksibel
+      const customSeconds = parseInt(dom.teacherGameTimerInput.value, 10);
+      state.timeLimit = (!isNaN(customSeconds) && customSeconds > 0) ? customSeconds : 120;
+      state.timeLeft = state.timeLimit;
+      dom.hudTimer.innerHTML = `${state.timeLimit}<span class="text-xs font-normal text-slate-400 ml-1">s</span>`;
+
+      state.pinchThreshold = parseFloat(dom.teacherPinchSens.value);
+      state.driftSpeedMultiplier = parseFloat(dom.teacherCardSpeed.value);
+      state.showFormula = dom.teacherToggleFormula.checked;
+      state.showSolution = dom.teacherToggleSolution.checked;
+      state.showSkeleton = dom.teacherToggleSkeleton.checked;
+      state.soundEnabled = dom.teacherToggleSound.checked;
+      soundEngine.enabled = state.soundEnabled;
+
+      dom.teacherModal.classList.add('hidden');
+    });
+
+    // Sound toggle in top header
+    dom.btnAudioToggle.addEventListener('click', () => {
+      state.soundEnabled = !state.soundEnabled;
+      soundEngine.enabled = state.soundEnabled;
+      if (state.soundEnabled) {
+        dom.iconSoundOn.classList.remove('hidden');
+        dom.iconSoundOff.classList.add('hidden');
+      } else {
+        dom.iconSoundOn.classList.add('hidden');
+        dom.iconSoundOff.classList.remove('hidden');
+      }
+    });
+
+    // Modal triggers
+    dom.btnStartGame.addEventListener('click', startGameSession);
+    dom.btnPlayAgain.addEventListener('click', startGameSession);
+    dom.btnBackToStart.addEventListener('click', () => {
+      dom.resultsModal.classList.add('hidden');
+      dom.startScreen.classList.remove('hidden');
+    });
+
+    dom.btnOpenTeacherMode.addEventListener('click', () => dom.teacherModal.classList.remove('hidden'));
+    dom.btnStartTeacherMode.addEventListener('click', () => dom.teacherModal.classList.remove('hidden'));
+    dom.btnCloseTeacherModal.addEventListener('click', () => dom.teacherModal.classList.add('hidden'));
+
+    dom.btnOpenLeaderboard.addEventListener('click', () => {
+      renderLeaderboardTable();
+      dom.leaderboardModal.classList.remove('hidden');
+    });
+    dom.btnStartLeaderboard.addEventListener('click', () => {
+      renderLeaderboardTable();
+      dom.leaderboardModal.classList.remove('hidden');
+    });
+    dom.btnCloseLeaderboard.addEventListener('click', () => dom.leaderboardModal.classList.add('hidden'));
+    dom.btnCloseLeaderboard2.addEventListener('click', () => dom.leaderboardModal.classList.add('hidden'));
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initMediaPipeHands();
+      renderLeaderboardTable();
+    });
+  </script>
+</body>
+</html>
